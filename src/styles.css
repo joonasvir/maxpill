@@ -323,9 +323,8 @@ body.opaque-shell .lbl-max::after {
 
 /* ── record menu ──────────────────────────────────────────────────── */
 
-#recWrap, #bgWrap { position: relative; pointer-events: auto; }
-#bgBtn .lead { opacity: 0.5; }
-#bgBtn #bgLabel { font-weight: 500; }
+#recWrap, #bgWrap, #brightWrap { position: relative; pointer-events: auto; }
+.pill .lead { opacity: 0.5; }
 /* the backdrop menu sits at the bottom of the screen, so it opens upward */
 .menu.menu-up { top: auto; bottom: calc(100% + 8px); }
 .menu.cols {

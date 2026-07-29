@@ -622,28 +622,44 @@ export function buildPanel(S: State, h: Hooks) {
   }
 
   // ── brightness ───────────────────────────────────────────────────────────
-  // A segmented dock rather than a native <select>: the picker could not be
-  // styled to match anything else on the canvas, which is what made this corner
-  // look bolted on. Same primitive as every other grouped control.
+  // Same primitive as the backdrop, deliberately: they sit side by side and do
+  // the same KIND of job — pick one named value from a list — so they should
+  // not be two different-looking controls.
   {
-    const host = document.getElementById('brightDock') as HTMLElement;
+    const btn = document.getElementById('brightBtn') as HTMLElement;
+    const menu = document.getElementById('brightMenu') as HTMLElement;
+    const label = document.getElementById('brightLabel') as HTMLElement;
     const LEVELS: Array<[string, number]> = [
       ['bright', 1.30], ['natural', 0.85], ['dim', 0.60], ['dark', 0.40], ['black', 0.20],
     ];
+    const setOpen = (open: boolean) => {
+      menu.hidden = !open;
+      btn.setAttribute('aria-expanded', String(open));
+    };
     const btns = LEVELS.map(([name, v]) => {
-      const b = el('button', '', host);
+      const b = el('button', '', menu);
       b.type = 'button';
       b.textContent = name;
       b.addEventListener('click', () => {
         S.exposure = v;
         h.onBloom();
+        setOpen(false);
         syncs.forEach((s) => s());
       });
       return b;
     });
-    syncs.push(() =>
-      btns.forEach((b, i) => b.classList.toggle('on', Math.abs(S.exposure - LEVELS[i][1]) < 0.02))
-    );
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      setOpen(menu.hidden);
+    });
+    menu.addEventListener('click', (e) => e.stopPropagation());
+    document.addEventListener('click', () => setOpen(false));
+    syncs.push(() => {
+      const hit = LEVELS.findIndex(([, v]) => Math.abs(S.exposure - v) < 0.02);
+      // says "custom" rather than lighting nothing when the value is hand-set
+      label.textContent = hit < 0 ? 'custom' : LEVELS[hit][0];
+      btns.forEach((b, i) => b.classList.toggle('on', i === hit));
+    });
   }
 
   // ── light

@@ -1,21 +1,11 @@
 # max pill
 
-**Live: [max.joonas.wtf](https://max.joonas.wtf) · [3d.joonas.wtf](https://3d.joonas.wtf)**
-
-A 3D playground for the Wabi **Max** pill and the Wabi mark — real refractive
-glass, per-channel dispersion, curated lighting, and a clip exporter. Built with
-three.js and a pile of hand-written environment shaders.
-
-> **Fonts are not in this repo.** Selecta is a licensed commercial typeface, so
-> the binaries are gitignored rather than redistributed. The app degrades
-> gracefully without them: the CSS falls back to `system-ui`, and the extruded
-> `Max` label falls back to its flat cutout. To get the real thing, drop
-> `Selecta-Italic.otf`, `Selecta-Italic.woff2`, `Selecta-Regular.otf` and
-> `Selecta-Medium.otf` into `public/fonts/`.
+A 3D playground for the Wabi **Max** pill — the orb-motion playground's sibling, but
+volumetric. Local port **3552** (Vite dev server, launch entry in both
+`wabi mini apps/.claude/launch.json` and this folder's own `.claude/launch.json`).
 
 ```bash
-npm install
-npm run dev
+cd "wabi mini apps/maxpill" && npm run dev     # → localhost:3552
 ```
 
 ## The premise

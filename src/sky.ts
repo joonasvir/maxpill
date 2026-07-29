@@ -489,7 +489,18 @@ void main() {
 export class SkyEnv {
   private renderer: THREE.WebGLRenderer;
   private pmrem: THREE.PMREMGenerator;
-  private rt: THREE.WebGLRenderTarget;
+  // TWO buffers, alternated. scene.environment worked because PMREM hands back
+  // a NEW texture object every bake, so three re-evaluates it. scene.background
+  // was handed the same object with the same `version` forever, and three's
+  // background renderer caches on exactly that pair — so the buffer's contents
+  // changed underneath it and it never looked again. Ping-ponging gives the
+  // background a new identity per bake, which is the same signal that already
+  // made the environment work.
+  private rts: THREE.WebGLRenderTarget[] = [];
+  private idx = 0;
+  private get rt() {
+    return this.rts[this.idx];
+  }
   private quadScene = new THREE.Scene();
   private quadCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
   private mat: THREE.ShaderMaterial;
@@ -503,8 +514,11 @@ export class SkyEnv {
   // was always deterministic, it was the sample offset that drifted.
   seed = 0;
 
-  /** Equirect texture — use as scene.background. */
-  readonly background: THREE.Texture;
+  /** Equirect texture — use as scene.background. Re-read it after every bake;
+   *  it is a different object each time, deliberately. */
+  get background(): THREE.Texture {
+    return this.rt.texture;
+  }
 
   /** debug: read the baked buffer back so a stale environment is provable */
   probe(x = 0.5, y = 0.75) {
@@ -520,24 +534,23 @@ export class SkyEnv {
     this.pmrem.compileEquirectangularShader();
 
     // Half-float so the sun and the blown highlights stay above 1.0 — clamping
-    // them to LDR here is what makes procedural glass look plastic.
-    // 1024×512 rather than 2048×1024. This buffer is baked AND run through
-    // PMREM on every environment change, and PMREM is a full mip chain of blur
-    // passes — quartering the pixels is the single biggest saving in the boot.
-    // The content is low-frequency (gradients and soft cloud), so the only cost
-    // is a slightly softer background; the environment map it feeds is blurred
-    // by construction and loses nothing at all.
-    this.rt = new THREE.WebGLRenderTarget(1024, 512, {
-      type: THREE.HalfFloatType,
-      format: THREE.RGBAFormat,
-      colorSpace: THREE.LinearSRGBColorSpace,
-      minFilter: THREE.LinearFilter,
-      magFilter: THREE.LinearFilter,
-      depthBuffer: false,
-      generateMipmaps: false,
-    });
-    this.rt.texture.mapping = THREE.EquirectangularReflectionMapping;
-    this.background = this.rt.texture;
+    // them to LDR here is what makes procedural glass look like plastic.
+    // 1024x512 rather than 2048x1024: this is baked AND run through PMREM (a
+    // full mip chain of blur passes) on every environment change, and the
+    // content is low-frequency, so only the background softens slightly.
+    for (let i = 0; i < 2; i++) {
+      const t = new THREE.WebGLRenderTarget(1024, 512, {
+        type: THREE.HalfFloatType,
+        format: THREE.RGBAFormat,
+        colorSpace: THREE.LinearSRGBColorSpace,
+        minFilter: THREE.LinearFilter,
+        magFilter: THREE.LinearFilter,
+        depthBuffer: false,
+        generateMipmaps: false,
+      });
+      t.texture.mapping = THREE.EquirectangularReflectionMapping;
+      this.rts.push(t);
+    }
 
     this.mat = new THREE.ShaderMaterial({
       vertexShader: VERT,
@@ -615,6 +628,8 @@ export class SkyEnv {
     this.mat.uniforms.uTime.value = seed;
     this.mat.uniforms.uCloud.value = this.cloud;
 
+    // alternate, so the texture handed to scene.background is a new object
+    this.idx ^= 1;
     const prevRT = this.renderer.getRenderTarget();
     this.renderer.setRenderTarget(this.rt);
     this.renderer.render(this.quadScene, this.quadCam);
@@ -626,7 +641,7 @@ export class SkyEnv {
   }
 
   dispose() {
-    this.rt.dispose();
+    this.rts.forEach((t) => t.dispose());
     this.envRT?.dispose();
     this.pmrem.dispose();
   }
