@@ -1,9 +1,3 @@
 node_modules
 dist
 .vercel
-
-# Selecta is a licensed commercial typeface. The binaries are deliberately NOT
-# committed — see README. Drop them in here locally and everything works.
-public/fonts/
-.DS_Store
-.claude/

@@ -584,6 +584,43 @@ export function buildPanel(S: State, h: Hooks) {
     });
   }
 
+  // ── backdrop ─────────────────────────────────────────────────────────────
+  // Twelve environments is too many for a segmented dock, and they were
+  // previously a wrapped grid of chips that read as a second copy of the
+  // curated looks. A named dropdown says what it is and shows the current value.
+  {
+    const btn = document.getElementById('bgBtn') as HTMLElement;
+    const menu = document.getElementById('bgMenu') as HTMLElement;
+    const label = document.getElementById('bgLabel') as HTMLElement;
+    menu.classList.add('cols');
+    const setOpen = (open: boolean) => {
+      menu.hidden = !open;
+      btn.setAttribute('aria-expanded', String(open));
+    };
+    const btns = ENV_NAMES.map((n) => {
+      const b = el('button', '', menu);
+      b.type = 'button';
+      b.textContent = n;
+      b.addEventListener('click', () => {
+        S.env = n;
+        h.onEnv();
+        setOpen(false);
+        syncs.forEach((s) => s());
+      });
+      return b;
+    });
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      setOpen(menu.hidden);
+    });
+    menu.addEventListener('click', (e) => e.stopPropagation());
+    document.addEventListener('click', () => setOpen(false));
+    syncs.push(() => {
+      label.textContent = S.env;
+      btns.forEach((b, i) => b.classList.toggle('on', ENV_NAMES[i] === S.env));
+    });
+  }
+
   // ── brightness ───────────────────────────────────────────────────────────
   // A segmented dock rather than a native <select>: the picker could not be
   // styled to match anything else on the canvas, which is what made this corner

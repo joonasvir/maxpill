@@ -324,6 +324,39 @@ function diverge() {
 
 // ── input: drag to turn, wheel to push in ───────────────────────────────────
 
+// The drawn cursor belongs to the 3D view, so it has to leave the moment the
+// pointer is anywhere near the chrome. Hit-testing the BUTTONS is not enough:
+// the bars are `pointer-events: none` containers, so the gaps between chips
+// still report as canvas and the cursor survived right up until it touched a
+// button. This tests the toolbar RECTS instead, grown by a margin, which is
+// also the "safety area" — it never gets close enough to overlap.
+const CHROME_MARGIN = 28;
+const CHROME_IDS = ['topLeft', 'topBars', 'bottomBars', 'fabs'];
+
+function overChrome(x: number, y: number) {
+  for (const id of CHROME_IDS) {
+    const el = document.getElementById(id);
+    // offsetParent is null for display:none, which is how the collapsed nav
+    // hides #topBars — its stale rect would otherwise keep a dead zone alive
+    if (!el || el.offsetParent === null) continue;
+    const r = el.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) continue;
+    if (
+      x >= r.left - CHROME_MARGIN && x <= r.right + CHROME_MARGIN &&
+      y >= r.top - CHROME_MARGIN && y <= r.bottom + CHROME_MARGIN
+    ) return true;
+  }
+  return false;
+}
+
+// Tracked on the DOCUMENT, not the canvas: once the pointer is over a button
+// the canvas stops receiving pointermove entirely, so a canvas-only listener
+// can never see it leave.
+document.addEventListener('pointermove', (e) => {
+  cursor.move(e.clientX, e.clientY);
+  cursor.setVisible(S.bigCursor && !overChrome(e.clientX, e.clientY));
+});
+
 const drag = { on: false, x: 0, y: 0, vx: 0, vy: 0, moved: 0 };
 
 // Flick inertia. Dragging stays 1:1 — anything smoothed on the way IN feels
@@ -367,7 +400,6 @@ canvas.addEventListener('pointerdown', (e) => {
 });
 canvas.addEventListener('pointermove', (e) => {
   if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-  cursor.move(e.clientX, e.clientY);
 
   if (pointers.size >= 2) {
     const d = pinchDist();
@@ -421,9 +453,12 @@ canvas.addEventListener('pointerleave', (e) => {
   releasePointer(e);
   cursor.setVisible(false);
 });
+document.addEventListener('pointerleave', () => cursor.setVisible(false));
 canvas.addEventListener('pointerenter', (e) => {
+  // warp rather than ease, so it does not come flying in from wherever it was
+  // left when the pointer last went over the chrome
   cursor.warp(e.clientX, e.clientY);
-  cursor.setVisible(S.bigCursor);
+  cursor.setVisible(S.bigCursor && !overChrome(e.clientX, e.clientY));
 });
 
 const _tq = new THREE.Quaternion();

@@ -9,9 +9,9 @@ three.js and a pile of hand-written environment shaders.
 > **Fonts are not in this repo.** Selecta is a licensed commercial typeface, so
 > the binaries are gitignored rather than redistributed. The app degrades
 > gracefully without them: the CSS falls back to `system-ui`, and the extruded
-> `Max` label falls back to its flat cutout (`loadFont` fails, the plane stays).
-> To get the real thing, drop `Selecta-Italic.otf`, `Selecta-Italic.woff2`,
-> `Selecta-Regular.otf` and `Selecta-Medium.otf` into `public/fonts/`.
+> `Max` label falls back to its flat cutout. To get the real thing, drop
+> `Selecta-Italic.otf`, `Selecta-Italic.woff2`, `Selecta-Regular.otf` and
+> `Selecta-Medium.otf` into `public/fonts/`.
 
 ```bash
 npm install
