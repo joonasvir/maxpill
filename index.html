@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#1f5fd0" />
+  <title>Max Pill</title>
+  <meta name="description" content="A 3D playground for the Wabi Max pill and the Wabi mark — real refractive glass, dispersion, and curated lighting." />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Max Pill — Wabi" />
+  <meta property="og:description" content="The Wabi Max tag is a capsule. Built as real refractive glass, with curated lighting, a play sequence and clip export." />
+  <meta property="og:image" content="https://3d.joonas.wtf/og.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:url" content="https://3d.joonas.wtf" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Max Pill — Wabi" />
+  <meta name="twitter:description" content="The Wabi Max tag is a capsule. Built as real refractive glass." />
+  <meta name="twitter:image" content="https://3d.joonas.wtf/og.png" />
+  <link rel="stylesheet" href="/src/styles.css" />
+</head>
+<body>
+  <!-- Held until the scene can actually be looked at: fonts parsed, outlines
+       extruded, environment baked and a couple of frames drawn. -->
+  <div id="loader" aria-live="polite" aria-label="loading">
+    <div class="loader-mark"></div>
+  </div>
+  <div id="stage">
+    <canvas id="gl"></canvas>
+    <!-- curated looks live on the canvas, not buried in the sheet: they are the
+         primary way to move around this app, so they must be one tap away -->
+    <!-- Always on screen: which object you are looking at is the top-level
+         choice, so it must not disappear with the collapsible look row. -->
+    <div id="topLeft">
+      <div id="subjectToggle" class="dock" role="group" aria-label="subject"></div>
+      <button id="navToggle" class="pill" aria-expanded="true" aria-controls="topBars">
+        <span id="navLabel">clean</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+    </div>
+
+    <div id="topBars">
+      <div id="curatedBar" class="chiprow" role="group" aria-label="curated looks"></div>
+
+      <div id="playBar">
+        <button id="playBtn" class="round" aria-label="play sequence">
+          <svg class="ico-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8.5 5.8v12.4c0 1 1.1 1.6 2 1.1l9.4-6.2c.8-.5.8-1.7 0-2.2L10.5 4.7c-.9-.5-2 .1-2 1.1Z"/></svg>
+          <svg class="ico-stop" viewBox="0 0 24 24" fill="currentColor"><rect x="6.5" y="6.5" width="11" height="11" rx="2.6"/></svg>
+        </button>
+
+        <!-- the trigger carries the live state; the actions live in the menu -->
+        <div id="recWrap">
+          <button id="recBtn" class="rec" aria-haspopup="true" aria-expanded="false">
+            <span class="rec-dot"></span>
+            <span class="rec-label">record</span>
+          </button>
+          <div id="recMenu" class="menu" hidden>
+            <button id="recSeqBtn" type="button">record sequence</button>
+            <button id="recTurnBtn" type="button">record turn</button>
+            <button id="stillBtn" type="button">save still</button>
+          </div>
+        </div>
+
+        <div id="speedChips" class="dock" role="group" aria-label="sequence speed"></div>
+      </div>
+    </div>
+
+    <div id="bottomBars">
+      <div id="brightDock" class="dock" role="group" aria-label="brightness"></div>
+    </div>
+
+    <div id="fabs">
+      <button id="cursorBtn" class="round" aria-label="cursor size" title="cursor size">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M5 2.6 19 12.2l-5.9.9 3.2 6.3-2.6 1.3-3.2-6.3L5 18.9z"/>
+        </svg>
+        <span id="cursorTier">M</span>
+      </button>
+      <button id="reshuffleBtn" class="round" aria-label="reshuffle" title="reshuffle">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 11a8 8 0 1 0-2.3 5.7" /><path d="M20 5v6h-6" />
+        </svg>
+      </button>
+      <button id="openPanel" class="round" aria-label="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <path d="M4 7h10M18 7h2M4 12h2M10 12h10M4 17h8M16 17h4" />
+          <circle cx="16" cy="7" r="2" fill="currentColor" stroke="none" />
+          <circle cx="8" cy="12" r="2" fill="currentColor" stroke="none" />
+          <circle cx="14" cy="17" r="2" fill="currentColor" stroke="none" />
+        </svg>
+      </button>
+    </div>
+  </div>
+  <div id="scrim"></div>
+  <aside id="sheet">
+    <header id="sheethead">
+      <span class="brand">Max<em>pill</em></span>
+      <span class="hint">drag to turn · tap to rattle</span>
+    </header>
+  </aside>
+  <script>
+    // Independent failsafe. The module may fail to parse, WebGL may be
+    // unavailable, boot may throw — none of that should leave someone staring
+    // at a splash screen. Whatever happens, the loader goes in 2.5s.
+    setTimeout(function () {
+      document.body.classList.add('loaded');
+      setTimeout(function () {
+        var el = document.getElementById('loader');
+        if (el) el.remove();
+      }, 700);
+    }, 1800);
+  </script>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
