@@ -29,6 +29,9 @@ const DEFAULTS: State = {
   lastLook: 'sky max',
   env: 'sky',
   shell: 'glass',
+  body: 'capsule',
+  slabDepth: 0.6,
+  labelText: 'Max',
   // Empty by default. The references are clean hollow glass — the contents are
   // a mode you opt into, not the resting state of the object.
   fill: 'empty',
@@ -72,7 +75,7 @@ const DEFAULTS: State = {
 
 // Bump on any defaults change — a stored blob from an older build silently
 // wins over new defaults and you end up debugging a look nobody else sees.
-const KEY = 'maxpill-v18';
+const KEY = 'maxpill-v19';
 // Which subject you land on is decided by the DOMAIN, and it overrides the
 // stored preference. Both hosts serve the same app, but a link has to be
 // dependable: max.joonas.wtf must always open on the pill and 3d.joonas.wtf on
@@ -243,6 +246,14 @@ function applyEnv() {
 }
 
 function applyShell() {
+  if (pill.body !== S.body || pill.slabDepth !== S.slabDepth) {
+    pill.setBody(S.body, S.slabDepth);
+  }
+  if (pill.text !== S.labelText) {
+    pill.text = S.labelText;
+    pill.setLabelText(S.labelText);
+    pill.buildLabel3D();
+  }
   pill.setShell(S.shell, scene.environment);
   const m = pill.shellMesh.material as THREE.MeshPhysicalMaterial;
   logo.setMaterial(m);
@@ -996,7 +1007,8 @@ async function boot() {
   } catch {
     /* fall through to the system face rather than blocking the scene */
   }
-  // NOT calling setLabelText('Max') here — the constructor already built those
+  pill.text = S.labelText;
+  // NOT calling setLabelText here — the constructor already built those
   // maps with exactly that string, and rebuilding them runs a half-million-pixel
   // distance transform a second time on the main thread before first paint.
 
@@ -1281,6 +1293,15 @@ addEventListener('keydown', (e) => {
     contents.impulse(5);
   }
 });
+
+declare const __BUILD__: string;
+(window as any).__MP_BUILD__ = __BUILD__;
+// Printed on every load: the first question when something looks wrong is
+// "which build are you actually running", and a long-lived tab keeps whatever
+// bundle it opened with.
+console.info(`%c max pill %c build ${__BUILD__} `,
+  'background:#171410;color:#fff;border-radius:3px 0 0 3px;padding:2px 4px',
+  'background:#e8e4dc;color:#171410;border-radius:0 3px 3px 0;padding:2px 4px');
 
 boot().catch((e) => {
   // show the scene anyway; a half-built playground beats a frozen splash

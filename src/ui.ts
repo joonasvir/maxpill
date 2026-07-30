@@ -1,5 +1,5 @@
 import { ENV_NAMES, type EnvName } from './sky';
-import { SHELL_NAMES, PILL_ASPECT, type Shell } from './pill';
+import { SHELL_NAMES, BODY_NAMES, PILL_ASPECT, type Shell, type Body } from './pill';
 import { FILL_NAMES, type Fill } from './contents';
 import {
   MOTION_NAMES,
@@ -179,6 +179,11 @@ export function buildPanel(S: State, h: Hooks) {
     });
     nav.addEventListener('click', () => (document.body.dataset.navUser = '1'), { once: true });
     apply();
+  }
+
+  {
+    const stamp = document.getElementById('buildStamp');
+    if (stamp) stamp.textContent = `build ${(window as any).__MP_BUILD__ ?? '?'}`;
   }
 
   const sheet = document.getElementById('sheet') as HTMLElement;
@@ -500,6 +505,14 @@ export function buildPanel(S: State, h: Hooks) {
   // ── shell
   {
     const b = section(sheet, 'shell');
+    chips<Body>(b, 'body', BODY_NAMES, () => S.body, (v) => {
+      S.body = v;
+      h.onShell();
+    });
+    slider(b, 'slab depth', 0.15, 1.6, 0.01, () => S.slabDepth, (v) => {
+      S.slabDepth = v;
+      h.onShell();
+    });
     chips<Shell>(b, 'material', SHELL_NAMES, () => S.shell, (v) => {
       S.shell = v;
       h.onShell();

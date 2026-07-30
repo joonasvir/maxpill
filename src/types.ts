@@ -1,5 +1,5 @@
 import type { EnvName } from './sky';
-import type { Shell } from './pill';
+import type { Shell, Body } from './pill';
 import type { Fill } from './contents';
 
 // Shared shape lives here rather than in main.ts so the panel can import it
@@ -40,6 +40,11 @@ export interface State {
   lastLook: string;
   env: EnvName;
   shell: Shell;
+  /** round capsule, or a flat slab with the type raised on the outside */
+  body: Body;
+  slabDepth: number;
+  /** what the label says — a look can change it */
+  labelText: string;
   fill: Fill;
   motion: Motion;
   count: number;

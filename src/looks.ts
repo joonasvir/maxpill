@@ -117,6 +117,47 @@ export const LOOKS: Look[] = [
       dofAperture: 0.6,
     },
   },
+  {
+    // The "wabi" reference: a FLAT lozenge of glass with the type raised on the
+    // outside, floating in blurred foliage. Two things make it read that way and
+    // neither is the material — the body is a slab rather than a capsule, so
+    // there is a broad front face for lettering to sit on, and the label moves
+    // OUT to that face instead of hanging inside the volume.
+    name: 'wabi',
+    note: 'flat glass lozenge in foliage — type raised on the outside face',
+    set: {
+      env: 'foliage',
+      shell: 'glass',
+      body: 'slab',
+      slabDepth: 0.62,
+      labelText: 'wabi',
+      fill: 'empty',
+      motion: 'float',
+      speed: 0.4,
+      dispersion: 2.4,
+      thickness: 0,
+      ior: 1.5,
+      roughness: 0.0,
+      aspect: 2.35,
+      cloud: 0,
+      bloom: 0.4,
+      exposure: 0.95,
+      label: true,
+      // a slab is wider than the capsule at the same aspect once its depth is
+      // in the bounding sphere, so it needs pulling back rather than pushing in
+      zoom: 0.82,
+      displace: 0,
+      // proud lettering needs real relief; the near-flat default was tuned for
+      // type cut INTO the glass, which is the opposite problem
+      textDepth: 0.085,
+      textBevel: 0.022,
+      dof: true,
+      dofFocus: 1,
+      dofAperture: 0.7,
+      revealStyle: 'thick',
+    },
+  },
+
   // ── glass, from the reference frames ──────────────────────────────────────
   {
     // Thickness is what kills a rainbow — a thick slab averages the three

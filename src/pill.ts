@@ -191,6 +191,66 @@ function buildCapsule(radius: number, cyl: number) {
   return g;
 }
 
+export type Body = 'capsule' | 'slab';
+export const BODY_NAMES: Body[] = ['capsule', 'slab'];
+
+/**
+ * A FLAT pill with depth rather than a body of revolution: the 2D stadium
+ * outline extruded and heavily bevelled.
+ *
+ * The bevel does all the work — it is the rounded edge that reads as a thick
+ * lozenge of glass. Taking it to ~40% of the half-height gives the pillowed
+ * section without the shape quietly becoming a capsule again, which is what
+ * happens if you let it approach the full radius.
+ *
+ * ExtrudeGeometry insets the bevel from the outline, so the silhouette stays
+ * exactly W x H and the proportion still comes from the Figma spec.
+ */
+function buildSlab(radius: number, cyl: number, depth: number) {
+  const r = radius;
+  const W = cyl + r * 2;
+  const w = Math.max(0.0001, W / 2 - r);
+
+  // Sampled polyline rather than lineTo + absarc. The arc version put a
+  // duplicate vertex where each arc met its adjoining straight, and the beveller
+  // turns a zero-length segment into a visible notch in the edge — the kind of
+  // artefact that looks like a modelling mistake rather than a seam.
+  const pts: THREE.Vector2[] = [];
+  const CAP = 40;
+  for (let i = 0; i <= CAP; i++) {
+    const a = -Math.PI / 2 + (Math.PI * i) / CAP;
+    pts.push(new THREE.Vector2(w + Math.cos(a) * r, Math.sin(a) * r));
+  }
+  for (let i = 0; i <= CAP; i++) {
+    const a = Math.PI / 2 + (Math.PI * i) / CAP;
+    pts.push(new THREE.Vector2(-w + Math.cos(a) * r, Math.sin(a) * r));
+  }
+  const sh = new THREE.Shape(pts);
+
+  const bevel = Math.min(radius * 0.4, depth * 0.45);
+  const g = new THREE.ExtrudeGeometry(sh, {
+    depth: Math.max(0.02, depth - bevel * 2),
+    bevelEnabled: true,
+    bevelThickness: bevel,
+    bevelSize: bevel,
+    bevelSegments: 10,
+    curveSegments: 48,
+  });
+  g.center();
+  g.computeVertexNormals();
+
+  // Same aStretch contract as the capsule so the orb reveal still works.
+  // Collapsing the straight section turns the slab into a rounded square rather
+  // than a sphere, which is the right analogue for a flat body.
+  const pos = g.attributes.position;
+  const a = new Float32Array(pos.count);
+  for (let i = 0; i < pos.count; i++) {
+    a[i] = THREE.MathUtils.clamp(pos.getX(i), -w, w);
+  }
+  g.setAttribute('aStretch', new THREE.BufferAttribute(a, 1));
+  return g;
+}
+
 export interface PillOpts {
   radius: number;
   aspect: number;
@@ -328,12 +388,15 @@ export class Pill {
   text = 'Max';
   depth = 0.02;
   bevel = 0.002;
+  body: Body = 'capsule';
+  slabDepth = 0.6;
 
   radius: number;
   /** half-length of the capsule's inner segment, local +X/-X */
   half: number;
 
-  private geo: THREE.CapsuleGeometry;
+  // widened from CapsuleGeometry: the body can now be an extruded slab too
+  private geo: THREE.BufferGeometry;
   private maps: TextMaps;
 
   constructor(opts: PillOpts) {
@@ -388,7 +451,9 @@ export class Pill {
       size: Math.min(lw / built0Aspect(this.font, this.text), this.radius * 2 * 0.44),
     });
     const old = this.label3d;
-    const mat = old ? (old.material as THREE.Material) : makeSolidLabelMat();
+    // rebuilt per body: the slab needs glass lettering, the capsule needs metal
+    old?.material && (old.material as THREE.Material).dispose();
+    const mat = makeSolidLabelMat(this.body === 'slab');
     const mesh = new THREE.Mesh(built.geo, mat);
     if (old) {
       old.geometry.dispose();
@@ -398,6 +463,7 @@ export class Pill {
     mesh.visible = this.label.visible;
     mesh.scale.copy(this.label.scale);
     this.group.add(mesh);
+    this.placeLabel();
     // the flat fallback steps aside once the solid exists
     this.label.visible = false;
     void total;
@@ -419,12 +485,43 @@ export class Pill {
     const cyl = Math.max(0.001, total - this.radius * 2);
     this.half = cyl / 2;
     this.geo.dispose();
-    this.geo = buildCapsule(this.radius, cyl);
+    this.geo = this.buildBody(cyl);
     this.shellMesh.geometry = this.geo;
 
     const [lw, lh] = this.labelSize(total);
     this.label.geometry.dispose();
     this.label.geometry = new THREE.PlaneGeometry(lw, lh);
+    this.placeLabel();
+  }
+
+  private buildBody(cyl: number) {
+    return this.body === 'slab'
+      ? buildSlab(this.radius, cyl, this.slabDepth)
+      : buildCapsule(this.radius, cyl);
+  }
+
+  /** Swap between the round capsule and the flat slab. */
+  setBody(body: Body, slabDepth: number) {
+    this.body = body;
+    this.slabDepth = slabDepth;
+    this.geo.dispose();
+    this.geo = this.buildBody(this.half * 2);
+    this.shellMesh.geometry = this.geo;
+    // the label's MATERIAL depends on the body, so it has to be rebuilt too
+    this.buildLabel3D();
+    this.placeLabel();
+  }
+
+  /**
+   * On a CAPSULE the label is suspended inside, which is what lets it refract
+   * through the body and read as a deboss. On a SLAB it sits proud of the front
+   * face the way the reference has it — raised glass lettering on the outside,
+   * catching its own highlights rather than being read through the thickness.
+   */
+  placeLabel() {
+    const z = this.body === 'slab' ? this.slabDepth * 0.5 : 0;
+    this.label.position.z = z;
+    if (this.label3d) this.label3d.position.z = z;
   }
 
   setShell(kind: Shell, env: THREE.Texture | null) {
@@ -661,7 +758,39 @@ function injectLabelReveal(mat: THREE.Material) {
 // Solid label: no alphaMap, so no cutout and no staircase. Opaque, therefore
 // captured by the transmission pass and refracted through the shell exactly as
 // the plane was — but with sides, a bevel and antialiased silhouettes.
-function makeSolidLabelMat() {
+/**
+ * Two label materials, because the two bodies pose opposite problems.
+ *
+ * Inside a capsule the label is seen THROUGH glass, so it has to be opaque and
+ * bright or the surrounding body swallows it — hence metal.
+ *
+ * Raised on a slab it is glass sitting on glass, and metal there reads as a
+ * flat grey ghost pasted on the front. It needs to be glass itself: its own
+ * transmission and a shallow thickness, so each stroke behaves like a bent
+ * tube of the same material and catches its own highlight down the spine.
+ */
+function makeSolidLabelMat(glassy = false) {
+  if (glassy) {
+    // A HIGHER ior than the body, deliberately. Matching the shell (1.5) made
+    // the strokes vanish — identical glass on identical glass has no boundary to
+    // see. Pushing to 1.78 with real dispersion and a faint warm attenuation
+    // gives each stroke its own refraction and edge colour, which is what makes
+    // it read as a separate tube lying on the surface.
+    return new THREE.MeshPhysicalMaterial({
+      transmission: 1,
+      thickness: 0.55,
+      ior: 1.78,
+      dispersion: 5.0,
+      roughness: 0.0,
+      metalness: 0,
+      attenuationColor: new THREE.Color(0xdfe9c8),
+      attenuationDistance: 1.4,
+      clearcoat: 1,
+      clearcoatRoughness: 0.03,
+      envMapIntensity: 1.6,
+      side: THREE.FrontSide,
+    });
+  }
   return new THREE.MeshPhysicalMaterial({
     metalness: 1,
     roughness: 0.12,

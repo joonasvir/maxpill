@@ -8,9 +8,9 @@ import * as THREE from 'three';
 // which then serves two jobs: scene.background (what you see behind the pill)
 // and, after PMREM, scene.environment (what the glass refracts and reflects).
 
-export type EnvName = 'sky' | 'soft' | 'golden' | 'dusk' | 'noir' | 'darkroom' | 'studio' | 'mono' | 'zebra' | 'chrome' | 'warm' | 'mist';
+export type EnvName = 'sky' | 'soft' | 'foliage' | 'golden' | 'dusk' | 'noir' | 'darkroom' | 'studio' | 'mono' | 'zebra' | 'chrome' | 'warm' | 'mist';
 
-export const ENV_NAMES: EnvName[] = ['sky', 'soft', 'golden', 'dusk', 'noir', 'darkroom', 'studio', 'mono', 'zebra', 'chrome', 'warm', 'mist'];
+export const ENV_NAMES: EnvName[] = ['sky', 'soft', 'foliage', 'golden', 'dusk', 'noir', 'darkroom', 'studio', 'mono', 'zebra', 'chrome', 'warm', 'mist'];
 
 const COMMON = /* glsl */ `
 precision highp float;
@@ -463,7 +463,61 @@ void main() {
 }
 `;
 
+// Blurred foliage. Not an attempt at leaves — at this blur a real canopy is
+// just overlapping soft discs of green at different depths, so that is what
+// this is: three layers of bokeh at falling scale and rising blur, over a
+// green-to-teal gradient, with a warm sun break. Clear glass in front of it
+// picks up the mottling, which is the whole reason the reference reads as
+// "outdoors" rather than "green studio".
+const FOLIAGE = /* glsl */ `
+float blob(vec3 d, vec3 c, float k) {
+  return pow(max(dot(d, normalize(c)), 0.0), k);
+}
+
+void main() {
+  vec3 d = dirFromUv(vUv);
+  float h = clamp(d.y * 0.5 + 0.5, 0.0, 1.0);
+
+  // A real canopy has enormous RANGE — deep shade under the leaves against
+  // blown sky between them. The first pass was a flat mid-green field, and
+  // clear glass in front of a flat field has nothing to gather, which is why it
+  // looked washed. These darks go far lower and the breaks far higher.
+  vec3 shade = vec3(0.006, 0.020, 0.010);
+  vec3 leaf  = vec3(0.070, 0.230, 0.080);
+  vec3 lit   = vec3(0.400, 0.640, 0.330);
+  vec3 col = mix(shade, leaf, smoothstep(0.10, 0.55, h));
+  col = mix(col, lit, smoothstep(0.60, 0.98, h));
+
+  // near mass: big soft shapes, pushed properly dark
+  vec3 p1 = d * 1.5 + vec3(uTime * 0.006, 0.0, 0.0);
+  float n1 = fbm(p1, 4);
+  col = mix(col, shade, smoothstep(0.38, 0.66, 1.0 - n1) * 0.9);
+
+  // mid leaves catching light
+  vec3 p2 = d * 3.0 + 7.0;
+  float n2 = fbm(p2, 4);
+  col = mix(col, vec3(0.300, 0.520, 0.230), smoothstep(0.52, 0.80, n2) * 0.75);
+
+  // fine bright breaks
+  vec3 p3 = d * 6.4 + 19.0;
+  float n3 = fbm(p3, 3);
+  col += vec3(0.60, 0.82, 0.42) * smoothstep(0.64, 0.88, n3) * 0.55;
+
+  // Blown bokeh discs. pow() with a high exponent gives a soft-edged circle, and
+  // taking them well past 1.0 is what puts a real specular on the glass rather
+  // than a dull sheen — the bright breaks between leaves are the light source.
+  col += vec3(1.00, 0.99, 0.88) * blob(d, vec3(0.50, 0.60, 0.62), 150.0) * 26.0;
+  col += vec3(0.98, 1.00, 0.86) * blob(d, vec3(0.14, 0.44, 0.90), 70.0) * 9.0;
+  col += vec3(0.92, 1.00, 0.80) * blob(d, vec3(-0.58, 0.34, 0.74), 44.0) * 4.5;
+  col += vec3(0.88, 0.98, 0.74) * blob(d, vec3(0.78, 0.16, -0.30), 30.0) * 2.2;
+  col += vec3(1.00, 0.97, 0.82) * pow(max(d.y, 0.0), 4.0) * 0.5;
+
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
+
 const FRAG: Record<EnvName, string> = {
+  foliage: COMMON + FOLIAGE,
   sky: COMMON + SKY,
   darkroom: COMMON + DARKROOM,
   soft: COMMON + SOFT,
